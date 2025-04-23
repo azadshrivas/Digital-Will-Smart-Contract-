@@ -1,0 +1,34 @@
+
+pragma solidity ^0.8.0;
+
+contract DigitalWill {
+    address public owner;
+    address public beneficiary;
+    uint256 public releaseTime;
+    bool public isClaimed;
+
+    constructor(address _beneficiary, uint256 _releaseTime) payable {
+        require(msg.value > 0, "Funds must be provided");
+        require(_releaseTime > block.timestamp, "Release time must be in the future");
+
+        owner = msg.sender;
+        beneficiary = _beneficiary;
+        releaseTime = _releaseTime;
+        isClaimed = false;
+    }
+
+    function claim() external {
+        require(msg.sender == beneficiary, "Only the beneficiary can claim");
+        require(block.timestamp >= releaseTime, "Funds are still locked");
+        require(!isClaimed, "Funds already claimed");
+
+        isClaimed = true;
+        payable(beneficiary).transfer(address(this).balance);
+    }
+
+    function updateBeneficiary(address _newBeneficiary) external {
+        require(msg.sender == owner, "Only owner can update");
+        require(block.timestamp < releaseTime, "Cannot update after release time");
+        beneficiary = _newBeneficiary;
+    }
+}

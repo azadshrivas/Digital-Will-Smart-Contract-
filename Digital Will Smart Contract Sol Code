@@ -17,6 +17,11 @@ contract DigitalWill {
         isClaimed = false;
     }
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+
     function claim() external {
         require(msg.sender == beneficiary, "Only the beneficiary can claim");
         require(block.timestamp >= releaseTime, "Funds are still locked");
@@ -26,9 +31,38 @@ contract DigitalWill {
         payable(beneficiary).transfer(address(this).balance);
     }
 
-    function updateBeneficiary(address _newBeneficiary) external {
-        require(msg.sender == owner, "Only owner can update");
+    function updateBeneficiary(address _newBeneficiary) external onlyOwner {
         require(block.timestamp < releaseTime, "Cannot update after release time");
         beneficiary = _newBeneficiary;
+    }
+
+    function revokeWill() external onlyOwner {
+        require(block.timestamp < releaseTime, "Cannot revoke after release time");
+        require(!isClaimed, "Funds already claimed");
+
+        isClaimed = true;
+        payable(owner).transfer(address(this).balance);
+    }
+
+    function getWillDetails() external view returns (
+        address _owner,
+        address _beneficiary,
+        uint256 _releaseTime,
+        uint256 _balance,
+        bool _isClaimed
+    ) {
+        return (
+            owner,
+            beneficiary,
+            releaseTime,
+            address(this).balance,
+            isClaimed
+        );
+    }
+
+    function extendReleaseTime(uint256 _newReleaseTime) external onlyOwner {
+        require(_newReleaseTime > releaseTime, "New release time must be in the future");
+        require(block.timestamp < releaseTime, "Cannot extend after release time");
+        releaseTime = _newReleaseTime;
     }
 }

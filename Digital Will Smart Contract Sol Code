@@ -7,6 +7,15 @@ contract DigitalWill {
     uint256 public releaseTime;
     bool public isClaimed;
 
+    event WillCreated(address indexed owner, address indexed beneficiary, uint256 releaseTime, uint256 value);
+    event BeneficiaryUpdated(address indexed newBeneficiary);
+    event WillRevoked(address indexed owner);
+    event FundsClaimed(address indexed beneficiary, uint256 amount);
+    event OwnerChanged(address indexed oldOwner, address indexed newOwner);
+    event OwnershipRenounced(address indexed oldOwner);
+    event FundsDeposited(address indexed from, uint256 amount);
+    event ReleaseTimeExtended(uint256 newReleaseTime);
+
     constructor(address _beneficiary, uint256 _releaseTime) payable {
         require(msg.value > 0, "Funds must be provided");
         require(_releaseTime > block.timestamp, "Release time must be in the future");
@@ -15,6 +24,8 @@ contract DigitalWill {
         beneficiary = _beneficiary;
         releaseTime = _releaseTime;
         isClaimed = false;
+
+        emit WillCreated(owner, beneficiary, releaseTime, msg.value);
     }
 
     modifier onlyOwner() {
@@ -28,12 +39,17 @@ contract DigitalWill {
         require(!isClaimed, "Funds already claimed");
 
         isClaimed = true;
-        payable(beneficiary).transfer(address(this).balance);
+        uint256 amount = address(this).balance;
+        payable(beneficiary).transfer(amount);
+
+        emit FundsClaimed(beneficiary, amount);
     }
 
     function updateBeneficiary(address _newBeneficiary) external onlyOwner {
         require(block.timestamp < releaseTime, "Cannot update after release time");
         beneficiary = _newBeneficiary;
+
+        emit BeneficiaryUpdated(_newBeneficiary);
     }
 
     function revokeWill() external onlyOwner {
@@ -41,7 +57,38 @@ contract DigitalWill {
         require(!isClaimed, "Funds already claimed");
 
         isClaimed = true;
-        payable(owner).transfer(address(this).balance);
+        uint256 amount = address(this).balance;
+        payable(owner).transfer(amount);
+
+        emit WillRevoked(owner);
+    }
+
+    function extendReleaseTime(uint256 _newReleaseTime) external onlyOwner {
+        require(_newReleaseTime > releaseTime, "New release time must be in the future");
+        require(block.timestamp < releaseTime, "Cannot extend after release time");
+        releaseTime = _newReleaseTime;
+
+        emit ReleaseTimeExtended(_newReleaseTime);
+    }
+
+    function depositMoreFunds() external payable onlyOwner {
+        require(msg.value > 0, "No ETH sent");
+        emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    function changeOwner(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Invalid address");
+        emit OwnerChanged(owner, _newOwner);
+        owner = _newOwner;
+    }
+
+    function renounceOwnership() external onlyOwner {
+        emit OwnershipRenounced(owner);
+        owner = address(0);
+    }
+
+    function isWillActive() external view returns (bool) {
+        return !isClaimed && block.timestamp < releaseTime;
     }
 
     function getWillDetails() external view returns (
@@ -58,11 +105,5 @@ contract DigitalWill {
             address(this).balance,
             isClaimed
         );
-    }
-
-    function extendReleaseTime(uint256 _newReleaseTime) external onlyOwner {
-        require(_newReleaseTime > releaseTime, "New release time must be in the future");
-        require(block.timestamp < releaseTime, "Cannot extend after release time");
-        releaseTime = _newReleaseTime;
     }
 }

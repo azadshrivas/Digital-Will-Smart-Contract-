@@ -33,39 +33,44 @@ contract DigitalWill {
         _;
     }
 
-    function claim() external {
+    modifier onlyBeneficiary() {
         require(msg.sender == beneficiary, "Only the beneficiary can claim");
-        require(block.timestamp >= releaseTime, "Funds are still locked");
-        require(!isClaimed, "Funds already claimed");
-
-        isClaimed = true;
-        uint256 amount = address(this).balance;
-        payable(beneficiary).transfer(amount);
-
-        emit FundsClaimed(beneficiary, amount);
+        _;
     }
 
-    function updateBeneficiary(address _newBeneficiary) external onlyOwner {
-        require(block.timestamp < releaseTime, "Cannot update after release time");
+    modifier willNotClaimed() {
+        require(!isClaimed, "Funds already claimed");
+        _;
+    }
+
+    modifier beforeReleaseTime() {
+        require(block.timestamp < releaseTime, "Action not allowed after release time");
+        _;
+    }
+
+    modifier afterReleaseTime() {
+        require(block.timestamp >= releaseTime, "Funds are still locked");
+        _;
+    }
+
+    function claim() external onlyBeneficiary afterReleaseTime willNotClaimed {
+        _claimFunds(beneficiary);
+    }
+
+    function updateBeneficiary(address _newBeneficiary) external onlyOwner beforeReleaseTime {
+        require(_newBeneficiary != address(0), "Invalid beneficiary address");
         beneficiary = _newBeneficiary;
 
         emit BeneficiaryUpdated(_newBeneficiary);
     }
 
-    function revokeWill() external onlyOwner {
-        require(block.timestamp < releaseTime, "Cannot revoke after release time");
-        require(!isClaimed, "Funds already claimed");
-
-        isClaimed = true;
-        uint256 amount = address(this).balance;
-        payable(owner).transfer(amount);
-
+    function revokeWill() external onlyOwner beforeReleaseTime willNotClaimed {
+        _claimFunds(owner);
         emit WillRevoked(owner);
     }
 
-    function extendReleaseTime(uint256 _newReleaseTime) external onlyOwner {
-        require(_newReleaseTime > releaseTime, "New release time must be in the future");
-        require(block.timestamp < releaseTime, "Cannot extend after release time");
+    function extendReleaseTime(uint256 _newReleaseTime) external onlyOwner beforeReleaseTime {
+        require(_newReleaseTime > releaseTime, "New release time must be later than current");
         releaseTime = _newReleaseTime;
 
         emit ReleaseTimeExtended(_newReleaseTime);
@@ -98,12 +103,16 @@ contract DigitalWill {
         uint256 _balance,
         bool _isClaimed
     ) {
-        return (
-            owner,
-            beneficiary,
-            releaseTime,
-            address(this).balance,
-            isClaimed
-        );
+        return (owner, beneficiary, releaseTime, address(this).balance, isClaimed);
+    }
+
+    /*** Internal functions ***/
+
+    function _claimFunds(address to) internal {
+        isClaimed = true;
+        uint256 amount = address(this).balance;
+        payable(to).transfer(amount);
+
+        emit FundsClaimed(to, amount);
     }
 }

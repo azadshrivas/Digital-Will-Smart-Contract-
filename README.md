@@ -18,4 +18,7 @@ To revolutionize legacy planning by enabling a self-executing, trustless digital
 - **Emergency Reclaim**: Allow owners to reclaim assets in special circumstances before death.
 
 contract address 0x1Cd652bC64Af3f09B490dAae27f46e53726ce230
+<img width="947" alt="image" src="https://github.com/user-attachments/assets/e2bb24e8-352d-4286-8bdb-3a9ac8eb2a4a" />
+
+
 
